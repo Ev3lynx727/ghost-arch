@@ -1,20 +1,35 @@
 #!/bin/bash
 
 # Ghostarch Installer - Main Entry Point
-# Custom Arch WSL2 setup with selected BlackArch tools
-# Inspired by BlackArch strap.sh, optimized for WSL2 and bleeding-edge tools
+# WSL2 Arch Linux setup with BlackArch tools
 #
-# This script orchestrates the full installation:
-#   1. install-core.sh - First-time setup (zsh, oh-my-zsh, repos)
-#   2. install-tools.sh - Post-installation (tools, user, workdir)
-#
-# For more control, run scripts individually:
-#   ./install-core.sh    # Core setup only
-#   ./install-tools.sh   # Tools and user configuration
+# This script:
+#   1. Installs core (zsh, oh-my-zsh, BlackArch repo)
+#   2. Creates user and workspace
+#   3. Sets default shell to zsh
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPTS_DIR="${SCRIPT_DIR}/scripts"
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+LOG_FILE="${LOG_FILE:-${HOME}/.ghostarch/install.log}"
+
+log_info() { echo -e "${GREEN}[INFO]${NC} $*"; echo "[$(date '+%Y-%m-%d %H:%M:%S')] [INFO] $*" >> "$LOG_FILE" 2>/dev/null || true; }
+log_warn() { echo -e "${YELLOW}[WARN]${NC} $*"; echo "[$(date '+%Y-%m-%d %H:%M:%S')] [WARN] $*" >> "$LOG_FILE" 2>/dev/null || true; }
+log_error() { echo -e "${RED}[ERROR]${NC} $*"; echo "[$(date '+%Y-%m-%d %H:%M:%S')] [ERROR] $*" >> "$LOG_FILE" 2>/dev/null || true; }
+
+init_logging() {
+    mkdir -p "$(dirname "$LOG_FILE")"
+    touch "$LOG_FILE"
+    chmod 644 "$LOG_FILE" 2>/dev/null || true
+}
 
 usage() {
     cat << EOF
@@ -26,26 +41,21 @@ USAGE:
 OPTIONS:
     -h, --help              Show this help message
     -n, --noninteractive   Run in non-interactive mode
-    -d, --debug             Enable debug output
-    --core-only             Run only install-core.sh
-    --tools-only            Run only install-tools.sh
+    -d, --debug            Enable debug output
 
 EXAMPLES:
-    $0                      # Full installation (core + tools)
-    $0 --core-only          # Core setup only (zsh, repos)
-    $0 --noninteractive     # Non-interactive full installation
+    $0                      # Interactive installation
+    $0 --noninteractive     # Non-interactive (use defaults)
 
 MODULAR USAGE:
-    ./install-core.sh       # First-time: zsh, oh-my-zsh, BlackArch repo
-    ./install-tools.sh      # Post-install: tools, user config, workdir
-    ./install-nvidia.sh     # Optional: GPU acceleration
+    ./scripts/install-core.sh    # Core only
+    ./scripts/install-tools.sh   # Tools only
+    ./scripts/install-nvidia.sh # GPU acceleration
 
 EOF
     exit 0
 }
 
-CORE_ONLY=false
-TOOLS_ONLY=false
 NONINTERACTIVE=0
 DEBUG=0
 
@@ -54,14 +64,141 @@ while [[ $# -gt 0 ]]; do
         -h|--help) usage ;;
         -n|--noninteractive) NONINTERACTIVE=1 ;;
         -d|--debug) DEBUG=1 ;;
-        --core-only) CORE_ONLY=true ;;
-        --tools-only) TOOLS_ONLY=true ;;
         *) echo "Unknown option: $1"; exit 1 ;;
     esac
     shift
 done
 
+prompt_user_setup() {
+    echo
+    log_info "=== User Configuration ==="
+    echo
+    
+    local user_choice="existing"
+    local current_user
+    
+    if [[ "$NONINTERACTIVE" != "1" ]]; then
+        echo -n "Create new user or use existing? (new/existing) [existing]: "
+        read -r user_choice
+        user_choice="${user_choice:-existing}"
+    fi
+    
+    case "$user_choice" in
+        new|NEW|New)
+            local new_username="ghostuser"
+            
+            if [[ "$NONINTERACTIVE" != "1" ]]; then
+                echo -n "Enter new username [ghostuser]: "
+                read -r new_username
+                new_username="${new_username:-ghostuser}"
+            fi
+            
+            if id "$new_username" &>/dev/null; then
+                log_warn "User $new_username already exists"
+                TARGET_USER="$new_username"
+            else
+                log_info "Creating user: $new_username"
+                useradd -m -G wheel "$new_username" 2>/dev/null || sudo useradd -m -G wheel "$new_username"
+                
+                if [[ "$NONINTERACTIVE" != "1" ]]; then
+                    echo -n "Set password for $new_username? (yes/no) [yes]: "
+                    read -r set_password
+                    set_password="${set_password:-yes}"
+                    
+                    if [[ "$set_password" == "yes" ]]; then
+                        sudo passwd "$new_username" 2>/dev/null || passwd "$new_username"
+                    fi
+                fi
+                
+                TARGET_USER="$new_username"
+                log_info "User $new_username created successfully"
+            fi
+            ;;
+        *)
+            TARGET_USER=$(whoami)
+            ;;
+    esac
+    
+    echo
+    log_info "Selected user: $TARGET_USER"
+}
+
+prompt_workdir_setup() {
+    echo
+    log_info "=== Working Directory Setup ==="
+    echo
+    
+    local workdir="${HOME}/ghostarch"
+    
+    if [[ "$NONINTERACTIVE" != "1" ]]; then
+        echo -n "Enter working directory path [$workdir]: "
+        read -r workdir_input
+        workdir="${workdir_input:-$workdir}"
+    fi
+    
+    WORKDIR="$workdir"
+    
+    log_info "Creating working directory: $WORKDIR"
+    mkdir -p "$WORKDIR"
+    
+    local init_git="yes"
+    if [[ "$NONINTERACTIVE" != "1" ]]; then
+        echo -n "Initialize git repository in workdir? (yes/no) [yes]: "
+        read -r init_git
+        init_git="${init_git:-yes}"
+    fi
+    
+    if [[ "$init_git" == "yes" ]]; then
+        if [[ ! -d "$WORKDIR/.git" ]]; then
+            git -C "$WORKDIR" init 2>/dev/null || log_warn "Failed to initialize git"
+        else
+            log_info "Git repo already exists"
+        fi
+    fi
+    
+    local create_subdirs="yes"
+    if [[ "$NONINTERACTIVE" != "1" ]]; then
+        echo -n "Create subdirectories (tools, exploits, wordlists)? (yes/no) [yes]: "
+        read -r create_subdirs
+        create_subdirs="${create_subdirs:-yes}"
+    fi
+    
+    if [[ "$create_subdirs" == "yes" ]]; then
+        mkdir -p "$WORKDIR"/{tools,exploits,wordlists,reports,logs}
+        log_info "Subdirectories created"
+    fi
+    
+    echo
+    log_info "Working directory: $WORKDIR"
+    echo "  - tools/    (pentesting tools)"
+    echo "  - exploits/ (exploit scripts)"
+    echo "  - wordlists/ (password lists)"
+    echo "  - reports/  (scan results)"
+    echo "  - logs/    (tool logs)"
+}
+
+setup_zsh() {
+    echo
+    log_info "=== Setting Up Zsh ==="
+    
+    if command -v zsh &>/dev/null; then
+        log_info "Setting zsh as default shell..."
+        
+        if [[ "$TARGET_USER" == "$(whoami)" ]]; then
+            chsh -s /bin/zsh 2>/dev/null || log_warn "Failed to set zsh as default shell"
+        else
+            sudo chsh -s /bin/zsh "$TARGET_USER" 2>/dev/null || log_warn "Failed to set zsh for user $TARGET_USER"
+        fi
+        
+        log_info "Zsh set as default shell"
+    else
+        log_warn "Zsh not installed, skipping shell change"
+    fi
+}
+
 main() {
+    init_logging
+    
     echo "============================================"
     echo "  Ghostarch Installer v1.0.0"
     echo "  Custom Arch WSL2 with BlackArch Tools"
@@ -76,37 +213,33 @@ main() {
         export DEBUG=1
     fi
     
-    if [[ "$CORE_ONLY" == "true" ]]; then
-        echo "Running core installation only..."
-        exec "$SCRIPT_DIR/install-core.sh" "$@"
-    fi
-    
-    if [[ "$TOOLS_ONLY" == "true" ]]; then
-        echo "Running tools installation only..."
-        exec "$SCRIPT_DIR/install-tools.sh" "$@"
-    fi
-    
-    echo "Running full installation..."
-    echo
-    
-    echo "Step 1/2: Core Installation (zsh, oh-my-zsh, BlackArch)"
+    echo "Step 1: Core Installation (zsh, oh-my-zsh, BlackArch)"
     echo "--------------------------------------------------------"
-    "$SCRIPT_DIR/install-core.sh" "$@"
+    "$SCRIPTS_DIR/install-core.sh" "$@"
     
     echo
-    echo "Step 2/2: Tools Installation (packages, user, workdir)"
+    echo "Step 2: User & Workspace Setup"
     echo "--------------------------------------------------------"
-    "$SCRIPT_DIR/install-tools.sh" "$@"
+    prompt_user_setup
+    prompt_workdir_setup
+    setup_zsh
     
     echo
     echo "============================================"
     echo "  Installation Complete!"
     echo "============================================"
     echo
-    echo "Next steps:"
-    echo "  - Optional: ./install-nvidia.sh for GPU acceleration"
-    echo "  - Check your working directory for tools"
+    echo "Summary:"
+    echo "  User: $TARGET_USER"
+    echo "  Working Directory: $WORKDIR"
+    echo "  Default Shell: zsh"
     echo
+    echo "Next steps:"
+    echo "  - Run ./scripts/install-tools.sh to install tools"
+    echo "  - Run ./scripts/install-nvidia.sh for GPU acceleration (optional)"
+    echo
+    
+    log_info "Installation completed successfully!"
 }
 
 main "$@"
