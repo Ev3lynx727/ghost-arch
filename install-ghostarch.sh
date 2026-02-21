@@ -101,12 +101,11 @@ prompt_user_setup() {
                 useradd -m -G wheel "$new_username" 2>/dev/null || sudo useradd -m -G wheel "$new_username"
                 
                 if [[ "$NONINTERACTIVE" != "1" ]]; then
-                    echo -n "Set password for $new_username? (yes/no) [yes]: "
-                    read -r set_password
-                    set_password="${set_password:-yes}"
-                    
-                    if [[ "$set_password" == "yes" ]]; then
-                        sudo passwd "$new_username" 2>/dev/null || passwd "$new_username"
+                    echo -n "Enter password for $new_username: "
+                    read -rs password
+                    echo
+                    if [[ -n "$password" ]]; then
+                        echo "$new_username:$password" | sudo chpasswd 2>/dev/null || log_warn "Failed to set password"
                     fi
                 fi
                 
