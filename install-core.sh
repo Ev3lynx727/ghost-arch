@@ -50,6 +50,8 @@ while [[ $# -gt 0 ]]; do
 done
 
 main() {
+    init_logging
+    
     log_info "Starting Ghostarch Core Installation"
     
     check_root
@@ -60,7 +62,6 @@ main() {
     fi
     
     check_sudo
-    init_logging
     load_config
     
     log_info "=== System Update ==="

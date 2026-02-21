@@ -7,7 +7,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-LOG_FILE="${LOG_FILE:-/var/log/ghostarch/install.log}"
+LOG_FILE="${LOG_FILE:-${HOME}/.ghostarch/install.log}"
 
 GHOSTARCH_VERSION="1.0.0"
 CONFIG_FILE="${PROJECT_ROOT}/config.sh"
@@ -40,17 +40,20 @@ log_error()  { log "ERROR" "$@"; }
 log_debug()  { log "DEBUG" "$@"; }
 
 init_logging() {
-    sudo mkdir -p "$(dirname "$LOG_FILE")"
-    sudo touch "$LOG_FILE"
-    sudo chmod 644 "$LOG_FILE"
+    mkdir -p "$(dirname "$LOG_FILE")"
+    touch "$LOG_FILE"
+    chmod 644 "$LOG_FILE" 2>/dev/null || true
     log_info "Ghostarch v${GHOSTARCH_VERSION} installation started"
 }
 
 check_root() {
     if [[ $EUID -eq 0 ]]; then
-        log_error "This script should NOT be run as root"
-        echo "Please run as a regular user with sudo privileges"
-        exit 1
+        if [[ -f /proc/version ]] && grep -qi microsoft /proc/version 2>/dev/null; then
+            log_warn "Running as root in WSL2 - some features may not work"
+            log_info "Consider running as regular user with sudo"
+        else
+            log_warn "Running as root - some features may not work as expected"
+        fi
     fi
 }
 

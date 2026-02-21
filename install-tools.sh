@@ -187,9 +187,10 @@ install_tool_group() {
 main() {
     log_info "Starting Ghostarch Tools Installation"
     
+    init_logging
+    
     check_root
     check_wsl
-    init_logging
     load_config
     
     echo
