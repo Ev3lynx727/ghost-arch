@@ -90,16 +90,13 @@ main() {
         git clone https://github.com/zsh-users/zsh-syntax-highlighting "${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/plugins/zsh-syntax-highlighting" 2>/dev/null || true
     fi
     
-    log_info "=== Cloning Ghostarch Repository ==="
-    local ghostarch_dir="${SCRIPT_DIR}"
-    if [[ ! -d "$ghostarch_dir/.git" ]]; then
-        git clone https://github.com/sst/ghost-arch.git /tmp/ghost-arch-temp 2>/dev/null || log_warn "Failed to clone ghost-arch repo"
-        if [[ -d /tmp/ghost-arch-temp ]]; then
-            cp -r /tmp/ghost-arch-temp/* "$ghostarch_dir/" 2>/dev/null || true
-            rm -rf /tmp/ghost-arch-temp
-        fi
+    log_info "=== Ghostarch Repository ==="
+    log_info "Using local repository at ${SCRIPT_DIR}"
+    
+    if [[ ! -d "${SCRIPT_DIR}/.git" ]]; then
+        log_warn "Not a git repository - skipping git operations"
     else
-        log_info "Ghostarch repo already exists"
+        log_info "Git repository detected"
     fi
     
     if [[ "$SKIP_BLACKARCH" != "true" ]]; then
