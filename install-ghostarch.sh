@@ -242,6 +242,31 @@ HEADER
     fi
 }
 
+configure_wsl_default_user() {
+    echo
+    log_info "=== Configuring WSL Default User ==="
+    
+    if [[ -f /proc/version ]] && grep -qi microsoft /proc/version; then
+        local wsl_conf="/etc/wsl.conf"
+        
+        log_info "Configuring WSL to default to user: $TARGET_USER"
+        
+        cat > "$wsl_conf" << EOF
+[user]
+default=$TARGET_USER
+EOF
+        
+        log_info "WSL default user configured"
+        echo
+        echo "IMPORTANT: Please run these commands in Windows PowerShell to apply:"
+        echo "  wsl --terminate ArchLinux"
+        echo "  wsl -d ArchLinux"
+        echo "This will restart WSL and apply the new default user."
+    else
+        log_info "Not running in WSL, skipping WSL configuration"
+    fi
+}
+
 main() {
     init_logging
     
@@ -270,6 +295,7 @@ main() {
     prompt_workdir_setup
     setup_zsh
     setup_zshrc
+    configure_wsl_default_user
     
     echo
     echo "============================================"
@@ -280,6 +306,10 @@ main() {
     echo "  User: $TARGET_USER"
     echo "  Working Directory: $WORKDIR"
     echo "  Default Shell: zsh"
+    echo
+    echo "IMPORTANT: Restart WSL to apply user changes:"
+    echo "  wsl --terminate ArchLinux"
+    echo "  wsl -d ArchLinux"
     echo
     echo "Next steps:"
     echo "  - Run ./scripts/install-tools.sh to install tools"
