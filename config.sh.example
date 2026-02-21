@@ -1,0 +1,95 @@
+#!/bin/bash
+
+# Ghostarch Configuration File
+# Copy this to config.sh and customize as needed
+
+# Installation Options
+INSTALL_ZSH=true
+INSTALL_OHMYZSH=true
+INSTALL_BLACKARCH=true
+
+# Working Directory (where tools will be cloned/stored)
+WORKDIR="${WORKDIR:-$HOME/ghostarch}"
+
+# User Configuration
+TARGET_USER="${TARGET_USER:-$(whoami)}"
+
+# Package Groups
+NETWORKING_PACKAGES=(
+    net-tools
+    iputils
+    openssh
+    curl
+    wget
+    bind-tools
+    socat
+    inetutils
+    tcpdump
+    openssl
+    speedtest-cli
+    htop
+    iotop
+    iftop
+    netcat
+    whois
+    p7zip
+)
+
+PROGRAMMING_PACKAGES=(
+    python
+    python-pip
+    python-virtualenv
+    go
+    ruby
+)
+
+PENTEST_PACKAGES=(
+    nmap
+    ettercap
+    wireshark-cli
+)
+
+RECON_PACKAGES=(
+    theharvester
+    recon-ng
+    dnsrecon
+)
+
+ADDITIONAL_PACKAGES=(
+    nikto
+    gobuster
+    metasploit
+    sqlmap
+    volatility
+)
+
+GPU_PACKAGES=(
+    nvidia
+    nvidia-utils
+    cuda
+    cuda-tools
+    hashcat
+)
+
+INSTALL_NETWORKING=true
+INSTALL_PROGRAMMING=true
+INSTALL_PENTEST=true
+INSTALL_RECON=true
+INSTALL_ADDITIONAL=true
+INSTALL_GPU=false
+
+# Oh-My-Zsh Configuration
+OMZ_REPO="https://github.com/ohmyzsh/ohmyzsh.git"
+OMZ_BRANCH="master"
+
+# BlackArch Configuration
+BLACKARCH_MIRROR="https://blackarch.org"
+
+# Logging
+LOG_FILE="${LOG_FILE:-/var/log/ghostarch/install.log}"
+
+# Non-interactive mode
+NONINTERACTIVE="${NONINTERACTIVE:-0}"
+
+# Debug mode
+DEBUG="${DEBUG:-0}"

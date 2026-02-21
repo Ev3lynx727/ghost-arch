@@ -1,0 +1,31 @@
+# Ghostarch Gitignore
+
+# Logs
+*.log
+/var/log/ghostarch/
+
+# Temporary files
+*.tmp
+*.temp
+/tmp/
+
+# Editor directories and files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Local config (keep config.sh.example)
+config.sh
+
+# Build outputs
+*.o
+*.a
+
+# WSL specific
+.wsl/
