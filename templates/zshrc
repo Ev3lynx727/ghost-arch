@@ -1,0 +1,62 @@
+# Ghostarch Zsh Configuration
+# Merged by install-ghostarch.sh
+
+# Enable Powerlevel10k theme if available
+if [[ -f ~/.oh-my-zsh/themes/powerlevel10k/powerlevel10k.zsh-theme ]]; then
+    ZSH_THEME="powerlevel10k/powerlevel10k"
+elif [[ -f ~/.oh-my-zsh/themes/robbyrussell.zsh-theme ]]; then
+    ZSH_THEME="robbyrussell"
+fi
+
+# Plugins
+plugins=(
+    git
+    docker
+    pip
+    python
+    sudo
+    command-not-found
+    zsh-autosuggestions
+    zsh-syntax-highlighting
+)
+
+# Oh-My-Zsh settings
+DISABLE_AUTO_UPDATE="true"
+DISABLE_UPDATE_PROMPT="true"
+HIST_STAMPS="yyyy-mm-dd"
+HISTSIZE=10000
+SAVEHIST=10000
+
+# Aliases
+alias ls='eza --icons'
+alias ll='eza -la --icons'
+alias la='eza -la --icons --group-directories-first'
+alias cat='bat'
+alias grep='grep --color=auto'
+alias ip='ip --color=auto'
+
+# Custom PATH
+export PATH="$HOME/.local/bin:$PATH"
+export PATH="$HOME/ghostarch/tools:$PATH"
+
+# Editor
+export EDITOR="nano"
+export VISUAL="nano"
+
+# Language
+export LANG="en_US.UTF-8"
+
+# Ghostarch environment
+export GHOSTARCH_HOME="$HOME/ghostarch"
+export GHOSTARCH_TOOLS="$HOME/ghostarch/tools"
+export GHOSTARCH_LOGS="$HOME/ghostarch/logs"
+
+# Enable color support
+autoload -U colors && colors
+
+# PS1 prompt (fallback if theme fails)
+PS1="%F{green}%n%f@%F{blue}%m%f:%F{yellow}%~%f\$ "
+
+# Initialize completion
+autoload -Uz compinit
+compinit
