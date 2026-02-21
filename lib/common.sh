@@ -178,7 +178,11 @@ add_blackarch_repo() {
     rm -f "$strap_sh"
     
     log_info "Installing BlackArch keyring..."
-    sudo pacman -S --noconfirm blackarch-keyring
+    if pacman -Qs blackarch-keyring > /dev/null 2>&1; then
+        log_info "BlackArch keyring already installed, skipping"
+    else
+        sudo pacman -S --noconfirm --overwrite='*' blackarch-keyring || log_warn "Keyring installation had issues, continuing..."
+    fi
 }
 
 cleanup() {
