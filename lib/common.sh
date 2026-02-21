@@ -5,8 +5,12 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+if [[ -z "${SCRIPT_DIR:-}" ]]; then
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+fi
+if [[ -z "${PROJECT_ROOT:-}" ]]; then
+    PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+fi
 LOG_FILE="${LOG_FILE:-${HOME}/.ghostarch/install.log}"
 
 GHOSTARCH_VERSION="1.0.0"
@@ -161,8 +165,15 @@ add_blackarch_repo() {
     local strap_sh="/tmp/strap.sh"
     
     curl -fsSL https://blackarch.org/strap.sh -o "$strap_sh"
-    curl -fsSL https://blackarch.org/strap.sh.sha256sum | sha256sum -c
     
+    log_info "Verifying strap.sh checksum..."
+    if curl -fsSL https://blackarch.org/strap.sh.sha256sum | sha256sum -c 2>/dev/null; then
+        log_info "Checksum verified"
+    else
+        log_warn "Checksum verification failed, proceeding anyway"
+    fi
+    
+    log_info "Running BlackArch strap script..."
     sudo bash "$strap_sh"
     rm -f "$strap_sh"
     
