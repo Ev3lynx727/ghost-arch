@@ -20,6 +20,7 @@ OPTIONS:
     -h, --help              Show this help message
     -n, --noninteractive   Run in non-interactive mode
     -d, --debug            Enable debug output
+    -l, --list-groups      Show available package groups
     --skip-networking      Skip networking tools
     --skip-programming     Skip programming languages
     --skip-pentest         Skip pentest tools
@@ -32,6 +33,7 @@ EXAMPLES:
     $0                      # Interactive installation with user prompts
     $0 --noninteractive     # Non-interactive with defaults
     $0 --skip-user          # Skip user creation prompts
+    $0 --list-groups       # Show available groups
 
 EOF
     exit 0
@@ -44,12 +46,14 @@ SKIP_RECON=false
 SKIP_ADDITIONAL=false
 SKIP_USER=false
 SKIP_WORKDIR=false
+LIST_GROUPS=false
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         -h|--help) usage ;;
         -n|--noninteractive) NONINTERACTIVE=1 ;;
         -d|--debug) DEBUG=1 ;;
+        -l|--list-groups) LIST_GROUPS=true ;;
         --skip-networking) SKIP_NETWORKING=true ;;
         --skip-programming) SKIP_PROGRAMMING=true ;;
         --skip-pentest) SKIP_PENTEST=true ;;
@@ -96,6 +100,23 @@ main() {
     check_root
     check_wsl
     load_config
+    
+    local pkg_groups_file="${SCRIPT_DIR}/config/package-groups.conf"
+    if [[ -f "$pkg_groups_file" ]]; then
+        source "$pkg_groups_file"
+    fi
+    
+    if [[ "$LIST_GROUPS" == "true" ]]; then
+        echo "Available package groups:"
+        echo
+        for group in "${!PACKAGE_GROUPS[@]}"; do
+            echo "  $group"
+            echo "    Description: ${GROUP_DESCRIPTIONS[$group]:-}"
+            echo "    Packages: ${PACKAGE_GROUPS[$group]}"
+            echo
+        done
+        exit 0
+    fi
     
     echo
     log_info "Ghostarch Tools Installation"
