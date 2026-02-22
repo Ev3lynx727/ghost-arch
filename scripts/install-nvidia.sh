@@ -54,13 +54,12 @@ main() {
     load_config
 
     log_info "Installing NVIDIA packages..."
-    local packages=(
-        nvidia
-        nvidia-utils
-        cuda
-        cuda-tools
-        hashcat
-    )
+    local packages
+    if declare -p GPU_PACKAGES &>/dev/null; then
+        packages=("${GPU_PACKAGES[@]}")
+    else
+        packages=(nvidia nvidia-utils cuda cuda-tools hashcat)
+    fi
     install_packages "${packages[@]}"
 
     if [[ "$SKIP_TEST" != "true" ]]; then

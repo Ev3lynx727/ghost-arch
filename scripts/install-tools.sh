@@ -140,24 +140,45 @@ main() {
     echo
     log_info "=== Installing Tools ==="
     
-    if [[ "$SKIP_NETWORKING" != "true" ]]; then
-        install_tool_group "Networking Tools" "${NETWORKING_PACKAGES[@]:-net-tools iputils openssh curl wget bind-tools socat inetutils tcpdump openssl speedtest-cli htop iotop iftop netcat whois p7zip}"
-    fi
-    
-    if [[ "$SKIP_PROGRAMMING" != "true" ]]; then
-        install_tool_group "Programming Languages" "${PROGRAMMING_PACKAGES[@]:-python python-pip python-virtualenv go ruby}"
-    fi
-    
-    if [[ "$SKIP_PENTEST" != "true" ]]; then
-        install_tool_group "Pentest Tools" "${PENTEST_PACKAGES[@]:-nmap ettercap wireshark-cli}"
-    fi
-    
-    if [[ "$SKIP_RECON" != "true" ]]; then
-        install_tool_group "Recon Tools" "${RECON_PACKAGES[@]:-theharvester recon-ng dnsrecon}"
-    fi
-    
-    if [[ "$SKIP_ADDITIONAL" != "true" ]]; then
-        install_tool_group "Additional Tools" "${ADDITIONAL_PACKAGES[@]:-nikto gobuster metasploit sqlmap volatility}"
+    if declare -p PACKAGE_GROUPS &>/dev/null; then
+        for group in "${!PACKAGE_GROUPS[@]}"; do
+            local skip=false
+            case "$group" in
+                networking) [[ "$SKIP_NETWORKING" == "true" ]] && skip=true ;;
+                programming) [[ "$SKIP_PROGRAMMING" == "true" ]] && skip=true ;;
+                pentest) [[ "$SKIP_PENTEST" == "true" ]] && skip=true ;;
+                recon) [[ "$SKIP_RECON" == "true" ]] && skip=true ;;
+                additional) [[ "$SKIP_ADDITIONAL" == "true" ]] && skip=true ;;
+            esac
+            
+            if [[ "$skip" == "true" ]]; then
+                log_info "Skipping $group"
+                continue
+            fi
+            
+            local desc="${GROUP_DESCRIPTIONS[$group]:-$group}"
+            install_tool_group "$desc" ${PACKAGE_GROUPS[$group]}
+        done
+    else
+        if [[ "$SKIP_NETWORKING" != "true" ]]; then
+            install_tool_group "Networking Tools" "${NETWORKING_PACKAGES[@]:-net-tools iputils openssh curl wget bind-tools socat inetutils tcpdump openssl speedtest-cli htop iotop iftop netcat whois p7zip}"
+        fi
+        
+        if [[ "$SKIP_PROGRAMMING" != "true" ]]; then
+            install_tool_group "Programming Languages" "${PROGRAMMING_PACKAGES[@]:-python python-pip python-virtualenv go ruby}"
+        fi
+        
+        if [[ "$SKIP_PENTEST" != "true" ]]; then
+            install_tool_group "Pentest Tools" "${PENTEST_PACKAGES[@]:-nmap ettercap wireshark-cli}"
+        fi
+        
+        if [[ "$SKIP_RECON" != "true" ]]; then
+            install_tool_group "Recon Tools" "${RECON_PACKAGES[@]:-theharvester recon-ng dnsrecon}"
+        fi
+        
+        if [[ "$SKIP_ADDITIONAL" != "true" ]]; then
+            install_tool_group "Additional Tools" "${ADDITIONAL_PACKAGES[@]:-nikto gobuster metasploit sqlmap volatility}"
+        fi
     fi
     
     generate_readme
