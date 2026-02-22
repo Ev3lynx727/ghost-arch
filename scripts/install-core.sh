@@ -57,12 +57,17 @@ main() {
     check_root
     check_wsl
     
+    load_config
+    
+    [[ "${INSTALL_ZSH:-true}" != "true" ]] && SKIP_ZSH=true
+    [[ "${INSTALL_OHMYZSH:-true}" != "true" ]] && SKIP_OMZ=true
+    [[ "${INSTALL_BLACKARCH:-true}" != "true" ]] && SKIP_BLACKARCH=true
+    
     if [[ "$SKIP_ZSH" != "true" ]] && [[ "$SKIP_OMZ" != "true" ]]; then
         check_network || exit 1
     fi
     
     check_sudo
-    load_config
     
     log_info "=== System Update ==="
     update_system
@@ -81,13 +86,15 @@ main() {
         if [[ -d "$HOME/.oh-my-zsh" ]]; then
             log_warn "Oh-My-Zsh already installed, skipping..."
         else
-            log_info "Cloning Oh-My-Zsh..."
-            sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended || log_warn "Oh-My-Zsh installation failed"
+            log_info "Installing Oh-My-Zsh (vendored)..."
+            source "${SCRIPT_DIR}/../vendors/oh-my-zsh-install.sh"
+            install_ohmyzsh
+            setup_ohmyzsh_unattended
         fi
         
         log_info "Installing Oh-My-Zsh plugins..."
-        git clone https://github.com/zsh-users/zsh-autosuggestions "${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/plugins/zsh-autosuggestions" 2>/dev/null || true
-        git clone https://github.com/zsh-users/zsh-syntax-highlighting "${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/plugins/zsh-syntax-highlighting" 2>/dev/null || true
+        source "${SCRIPT_DIR}/../vendors/oh-my-zsh-install.sh"
+        install_ohmyzsh_plugins
     fi
     
     log_info "=== Ghostarch Repository ==="

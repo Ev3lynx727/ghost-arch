@@ -8,6 +8,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib/common.sh"
+source "${SCRIPT_DIR}/lib/users.sh"
 
 usage() {
     cat << EOF
@@ -60,103 +61,6 @@ while [[ $# -gt 0 ]]; do
     esac
     shift
 done
-
-prompt_user_setup() {
-    echo
-    log_info "=== User Configuration ==="
-    echo
-    
-    if [[ "$SKIP_USER" == "true" ]]; then
-        log_warn "Skipping user configuration"
-        return 0
-    fi
-    
-    local user_choice
-    prompt_user "Create new user or use existing? (new/existing)" "existing" user_choice
-    
-    case "$user_choice" in
-        new|NEW|New)
-            local new_username
-            prompt_user "Enter new username" "ghostuser" new_username
-            
-            if id "$new_username" &>/dev/null; then
-                log_warn "User $new_username already exists"
-                TARGET_USER="$new_username"
-            else
-                log_info "Creating user: $new_username"
-                sudo useradd -m -s /bin/zsh -G wheel "$new_username"
-                
-                prompt_user "Set password for $new_username? (yes/no)" "yes" set_password
-                if [[ "$set_password" == "yes" ]]; then
-                    sudo passwd "$new_username"
-                fi
-                
-                TARGET_USER="$new_username"
-                log_info "User $new_username created successfully"
-            fi
-            ;;
-        existing|EXISTING|Existing)
-            local current_user
-            current_user=$(whoami)
-            prompt_user "Enter username" "$current_user" TARGET_USER
-            
-            if ! id "$TARGET_USER" &>/dev/null; then
-                log_error "User $TARGET_USER does not exist"
-                exit 1
-            fi
-            ;;
-        *)
-            log_error "Invalid choice"
-            exit 1
-            ;;
-    esac
-    
-    echo
-    log_info "Selected user: $TARGET_USER"
-}
-
-prompt_workdir_setup() {
-    echo
-    log_info "=== Working Directory Setup ==="
-    echo
-    
-    if [[ "$SKIP_WORKDIR" == "true" ]]; then
-        log_warn "Skipping working directory setup"
-        return 0
-    fi
-    
-    prompt_user "Enter working directory path" "$HOME/ghostarch" WORKDIR
-    
-    log_info "Creating working directory: $WORKDIR"
-    sudo -u "$TARGET_USER" mkdir -p "$WORKDIR"
-    
-    local init_git
-    prompt_user "Initialize git repository in workdir? (yes/no)" "yes" init_git
-    
-    if [[ "$init_git" == "yes" ]]; then
-        if [[ ! -d "$WORKDIR/.git" ]]; then
-            sudo -u "$TARGET_USER" git -C "$WORKDIR" init || log_warn "Failed to initialize git"
-        else
-            log_info "Git repo already exists"
-        fi
-    fi
-    
-    local create_subdirs
-    prompt_user "Create subdirectories (tools, exploits, wordlists)? (yes/no)" "yes" create_subdirs
-    
-    if [[ "$create_subdirs" == "yes" ]]; then
-        sudo -u "$TARGET_USER" mkdir -p "$WORKDIR"/{tools,exploits,wordlists,reports,logs}
-        log_info "Subdirectories created"
-    fi
-    
-    echo
-    log_info "Working directory: $WORKDIR"
-    echo "  - tools/    (pentesting tools)"
-    echo "  - exploits/ (exploit scripts)"
-    echo "  - wordlists/ (password lists)"
-    echo "  - reports/  (scan results)"
-    echo "  - logs/    (tool logs)"
-}
 
 install_tool_group() {
     local group_name="$1"

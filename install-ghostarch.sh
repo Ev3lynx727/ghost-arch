@@ -105,7 +105,7 @@ prompt_user_setup() {
                     read -rs password
                     echo
                     if [[ -n "$password" ]]; then
-                        echo "$new_username:$password" | sudo chpasswd 2>/dev/null || log_warn "Failed to set password"
+                        echo "$new_username:$password" | chpasswd 2>/dev/null || sudo chpasswd 2>/dev/null || log_warn "Failed to set password"
                     fi
                 fi
                 
@@ -120,6 +120,11 @@ prompt_user_setup() {
     
     echo
     log_info "Selected user: $TARGET_USER"
+    
+    if ! groups "$TARGET_USER" 2>/dev/null | grep -qw wheel; then
+        log_info "Adding $TARGET_USER to wheel group"
+        usermod -aG wheel "$TARGET_USER" 2>/dev/null || sudo usermod -aG wheel "$TARGET_USER" 2>/dev/null || log_warn "Failed to add user to wheel group"
+    fi
 }
 
 prompt_workdir_setup() {
