@@ -29,3 +29,8 @@ config.sh
 
 # WSL specific
 .wsl/
+
+# Ghostclaw / Agent state
+.ghostclaw/
+.qlty/
+.codeguardian/

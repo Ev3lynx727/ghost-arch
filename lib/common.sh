@@ -26,7 +26,8 @@ log() {
     local level="$1"
     shift
     local msg="$*"
-    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    local timestamp
+    timestamp=$(date '+%Y-%m-%d %H:%M:%S')
     
     case "$level" in
         INFO)  echo -e "${GREEN}[INFO]${NC} $msg" ;;
@@ -91,6 +92,7 @@ check_sudo() {
 load_config() {
     if [[ -f "$CONFIG_FILE" ]]; then
         log_info "Loading configuration from $CONFIG_FILE"
+        # shellcheck disable=SC1090
         source "$CONFIG_FILE"
     else
         log_warn "Config file not found, using defaults"
@@ -139,6 +141,99 @@ prompt_user() {
     
     local result="${input:-$default}"
     eval "$var_name='$result'"
+}
+
+prompt_user_setup() {
+    echo
+    log_info "=== User Configuration ==="
+    echo
+
+    if [[ "${SKIP_USER:-false}" == "true" ]]; then
+        log_warn "Skipping user configuration"
+        TARGET_USER="${TARGET_USER:-$(whoami)}"
+        return 0
+    fi
+
+    local user_choice
+    prompt_user "Create new user or use existing? (new/existing)" "existing" user_choice
+
+    case "$user_choice" in
+        new|NEW|New)
+            local new_username
+            prompt_user "Enter new username" "ghostuser" new_username
+
+            if id "$new_username" &>/dev/null; then
+                log_warn "User $new_username already exists"
+                TARGET_USER="$new_username"
+            else
+                log_info "Creating user: $new_username"
+                sudo useradd -m -s /bin/zsh -G wheel "$new_username"
+
+                if [[ "${NONINTERACTIVE:-0}" != "1" ]]; then
+                    local set_password
+                    prompt_user "Set password for $new_username? (yes/no)" "yes" set_password
+                    if [[ "$set_password" == "yes" ]]; then
+                        sudo passwd "$new_username"
+                    fi
+                fi
+
+                TARGET_USER="$new_username"
+                log_info "User $new_username created successfully"
+            fi
+            ;;
+        *)
+            local current_user
+            current_user=$(whoami)
+            prompt_user "Enter username" "$current_user" TARGET_USER
+
+            if ! id "$TARGET_USER" &>/dev/null; then
+                log_error "User $TARGET_USER does not exist"
+                exit 1
+            fi
+            ;;
+    esac
+
+    echo
+    log_info "Selected user: $TARGET_USER"
+}
+
+prompt_workdir_setup() {
+    echo
+    log_info "=== Working Directory Setup ==="
+    echo
+
+    if [[ "${SKIP_WORKDIR:-false}" == "true" ]]; then
+        log_warn "Skipping working directory setup"
+        WORKDIR="${WORKDIR:-$HOME/ghostarch}"
+        return 0
+    fi
+
+    prompt_user "Enter working directory path" "${HOME}/ghostarch" WORKDIR
+
+    log_info "Creating working directory: $WORKDIR"
+    sudo -u "$TARGET_USER" mkdir -p "$WORKDIR"
+
+    local init_git
+    prompt_user "Initialize git repository in workdir? (yes/no)" "yes" init_git
+
+    if [[ "$init_git" == "yes" ]]; then
+        if [[ ! -d "$WORKDIR/.git" ]]; then
+            sudo -u "$TARGET_USER" git -C "$WORKDIR" init || log_warn "Failed to initialize git"
+        else
+            log_info "Git repo already exists"
+        fi
+    fi
+
+    local create_subdirs
+    prompt_user "Create subdirectories (tools, exploits, wordlists)? (yes/no)" "yes" create_subdirs
+
+    if [[ "$create_subdirs" == "yes" ]]; then
+        sudo -u "$TARGET_USER" mkdir -p "$WORKDIR"/{tools,exploits,wordlists,reports,logs}
+        log_info "Subdirectories created"
+    fi
+
+    echo
+    log_info "Working directory: $WORKDIR"
 }
 
 install_packages() {

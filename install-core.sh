@@ -6,8 +6,17 @@
 
 set -euo pipefail
 
+# Get script directory and project root
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/lib/common.sh"
+PROJECT_ROOT="${SCRIPT_DIR}"
+
+# Source common library
+if [[ -f "${PROJECT_ROOT}/lib/common.sh" ]]; then
+    source "${PROJECT_ROOT}/lib/common.sh"
+else
+    echo "Error: Could not find ${PROJECT_ROOT}/lib/common.sh"
+    exit 1
+fi
 
 usage() {
     cat << EOF
@@ -39,8 +48,8 @@ SKIP_BLACKARCH=false
 while [[ $# -gt 0 ]]; do
     case "$1" in
         -h|--help) usage ;;
-        -n|--noninteractive) NONINTERACTIVE=1 ;;
-        -d|--debug) DEBUG=1 ;;
+        -n|--noninteractive) export NONINTERACTIVE=1 ;;
+        -d|--debug) export DEBUG=1 ;;
         --skip-zsh) SKIP_ZSH=true ;;
         --skip-omz) SKIP_OMZ=true ;;
         --skip-blackarch) SKIP_BLACKARCH=true ;;
@@ -56,14 +65,13 @@ main() {
     
     check_root
     check_wsl
-    
     load_config
     
     [[ "${INSTALL_ZSH:-true}" != "true" ]] && SKIP_ZSH=true
     [[ "${INSTALL_OHMYZSH:-true}" != "true" ]] && SKIP_OMZ=true
     [[ "${INSTALL_BLACKARCH:-true}" != "true" ]] && SKIP_BLACKARCH=true
     
-    if [[ "$SKIP_ZSH" != "true" ]] && [[ "$SKIP_OMZ" != "true" ]]; then
+    if [[ "$SKIP_ZSH" != "true" ]] || [[ "$SKIP_OMZ" != "true" ]]; then
         check_network || exit 1
     fi
     
@@ -75,9 +83,6 @@ main() {
     if [[ "$SKIP_ZSH" != "true" ]]; then
         log_info "=== Installing Zsh ==="
         install_packages zsh
-        
-        log_info "Setting zsh as default shell..."
-        chsh -s /bin/zsh || log_warn "Failed to set zsh as default shell"
     fi
     
     if [[ "$SKIP_OMZ" != "true" ]]; then
@@ -87,23 +92,22 @@ main() {
             log_warn "Oh-My-Zsh already installed, skipping..."
         else
             log_info "Installing Oh-My-Zsh (vendored)..."
-            source "${SCRIPT_DIR}/../vendors/oh-my-zsh-install.sh"
-            install_ohmyzsh
-            setup_ohmyzsh_unattended
+            if [[ -f "${PROJECT_ROOT}/vendors/oh-my-zsh-install.sh" ]]; then
+                source "${PROJECT_ROOT}/vendors/oh-my-zsh-install.sh"
+                install_ohmyzsh
+                setup_ohmyzsh_unattended
+                install_ohmyzsh_plugins
+            else
+                log_warn "Vendored oh-my-zsh installer not found. Installing plugins manually..."
+                local omz_custom="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"
+                if [[ ! -d "${omz_custom}/plugins/zsh-autosuggestions" ]]; then
+                    git clone https://github.com/zsh-users/zsh-autosuggestions "${omz_custom}/plugins/zsh-autosuggestions" 2>/dev/null || true
+                fi
+                if [[ ! -d "${omz_custom}/plugins/zsh-syntax-highlighting" ]]; then
+                    git clone https://github.com/zsh-users/zsh-syntax-highlighting "${omz_custom}/plugins/zsh-syntax-highlighting" 2>/dev/null || true
+                fi
+            fi
         fi
-        
-        log_info "Installing Oh-My-Zsh plugins..."
-        source "${SCRIPT_DIR}/../vendors/oh-my-zsh-install.sh"
-        install_ohmyzsh_plugins
-    fi
-    
-    log_info "=== Ghostarch Repository ==="
-    log_info "Using local repository at ${SCRIPT_DIR}"
-    
-    if [[ ! -d "${SCRIPT_DIR}/.git" ]]; then
-        log_warn "Not a git repository - skipping git operations"
-    else
-        log_info "Git repository detected"
     fi
     
     if [[ "$SKIP_BLACKARCH" != "true" ]]; then

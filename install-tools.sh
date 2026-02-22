@@ -6,9 +6,22 @@
 
 set -euo pipefail
 
+# Get script directory and project root
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/lib/common.sh"
-source "${SCRIPT_DIR}/lib/users.sh"
+PROJECT_ROOT="${SCRIPT_DIR}"
+
+# Source common library
+if [[ -f "${PROJECT_ROOT}/lib/common.sh" ]]; then
+    source "${PROJECT_ROOT}/lib/common.sh"
+else
+    echo "Error: Could not find ${PROJECT_ROOT}/lib/common.sh"
+    exit 1
+fi
+
+# Source user management library
+if [[ -f "${PROJECT_ROOT}/lib/users.sh" ]]; then
+    source "${PROJECT_ROOT}/lib/users.sh"
+fi
 
 usage() {
     cat << EOF
@@ -44,23 +57,23 @@ SKIP_PROGRAMMING=false
 SKIP_PENTEST=false
 SKIP_RECON=false
 SKIP_ADDITIONAL=false
-SKIP_USER=false
-SKIP_WORKDIR=false
+export SKIP_USER=false
+export SKIP_WORKDIR=false
 LIST_GROUPS=false
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         -h|--help) usage ;;
-        -n|--noninteractive) NONINTERACTIVE=1 ;;
-        -d|--debug) DEBUG=1 ;;
+        -n|--noninteractive) export NONINTERACTIVE=1 ;;
+        -d|--debug) export DEBUG=1 ;;
         -l|--list-groups) LIST_GROUPS=true ;;
         --skip-networking) SKIP_NETWORKING=true ;;
         --skip-programming) SKIP_PROGRAMMING=true ;;
         --skip-pentest) SKIP_PENTEST=true ;;
         --skip-recon) SKIP_RECON=true ;;
         --skip-additional) SKIP_ADDITIONAL=true ;;
-        --skip-user) SKIP_USER=true ;;
-        --skip-workdir) SKIP_WORKDIR=true ;;
+        --skip-user) export SKIP_USER=true ;;
+        --skip-workdir) export SKIP_WORKDIR=true ;;
         *) log_error "Unknown option: $1"; exit 1 ;;
     esac
     shift
@@ -92,109 +105,6 @@ install_tool_group() {
     log_info "$group_name installation complete"
 }
 
-main() {
-    log_info "Starting Ghostarch Tools Installation"
-    
-    init_logging
-    
-    check_root
-    check_wsl
-    load_config
-    
-    local pkg_groups_file="${SCRIPT_DIR}/config/package-groups.conf"
-    if [[ -f "$pkg_groups_file" ]]; then
-        source "$pkg_groups_file"
-    fi
-    
-    if [[ "$LIST_GROUPS" == "true" ]]; then
-        echo "Available package groups:"
-        echo
-        for group in "${!PACKAGE_GROUPS[@]}"; do
-            echo "  $group"
-            echo "    Description: ${GROUP_DESCRIPTIONS[$group]:-}"
-            echo "    Packages: ${PACKAGE_GROUPS[$group]}"
-            echo
-        done
-        exit 0
-    fi
-    
-    echo
-    log_info "Ghostarch Tools Installation"
-    echo "=============================="
-    echo
-    
-    if [[ "$NONINTERACTIVE" != "1" ]]; then
-        echo "This will install:"
-        echo "  - Networking tools"
-        echo "  - Programming languages"
-        echo "  - Penetration testing tools"
-        echo "  - Reconnaissance tools"
-        echo "  - Additional tools"
-        echo
-        confirm "Continue?" "Y" || exit 0
-    fi
-    
-    prompt_user_setup
-    prompt_workdir_setup
-    
-    echo
-    log_info "=== Installing Tools ==="
-    
-    if declare -p PACKAGE_GROUPS &>/dev/null; then
-        for group in "${!PACKAGE_GROUPS[@]}"; do
-            local skip=false
-            case "$group" in
-                networking) [[ "$SKIP_NETWORKING" == "true" ]] && skip=true ;;
-                programming) [[ "$SKIP_PROGRAMMING" == "true" ]] && skip=true ;;
-                pentest) [[ "$SKIP_PENTEST" == "true" ]] && skip=true ;;
-                recon) [[ "$SKIP_RECON" == "true" ]] && skip=true ;;
-                additional) [[ "$SKIP_ADDITIONAL" == "true" ]] && skip=true ;;
-            esac
-            
-            if [[ "$skip" == "true" ]]; then
-                log_info "Skipping $group"
-                continue
-            fi
-            
-            local desc="${GROUP_DESCRIPTIONS[$group]:-$group}"
-            install_tool_group "$desc" ${PACKAGE_GROUPS[$group]}
-        done
-    else
-        if [[ "$SKIP_NETWORKING" != "true" ]]; then
-            install_tool_group "Networking Tools" "${NETWORKING_PACKAGES[@]:-net-tools iputils openssh curl wget bind-tools socat inetutils tcpdump openssl speedtest-cli htop iotop iftop netcat whois p7zip}"
-        fi
-        
-        if [[ "$SKIP_PROGRAMMING" != "true" ]]; then
-            install_tool_group "Programming Languages" "${PROGRAMMING_PACKAGES[@]:-python python-pip python-virtualenv go ruby}"
-        fi
-        
-        if [[ "$SKIP_PENTEST" != "true" ]]; then
-            install_tool_group "Pentest Tools" "${PENTEST_PACKAGES[@]:-nmap ettercap wireshark-cli}"
-        fi
-        
-        if [[ "$SKIP_RECON" != "true" ]]; then
-            install_tool_group "Recon Tools" "${RECON_PACKAGES[@]:-theharvester recon-ng dnsrecon}"
-        fi
-        
-        if [[ "$SKIP_ADDITIONAL" != "true" ]]; then
-            install_tool_group "Additional Tools" "${ADDITIONAL_PACKAGES[@]:-nikto gobuster metasploit sqlmap volatility}"
-        fi
-    fi
-    
-    generate_readme
-    
-    log_info "=== Tools Installation Complete ==="
-    echo
-    echo "Summary:"
-    echo "  User: $TARGET_USER"
-    echo "  Working Directory: $WORKDIR"
-    echo
-    echo "Next steps:"
-    echo "  - Run ./install-nvidia.sh for GPU acceleration (optional)"
-    echo "  - Check $WORKDIR for your tools"
-    echo
-}
-
 generate_readme() {
     log_info "Generating README..."
     
@@ -209,9 +119,9 @@ Ghostarch is a streamlined setup for Arch Linux in WSL2, integrating selected bl
 
 ## Installation
 1. Install Arch Linux in WSL2 using the official image.
-2. Run \`install-core.sh\` to set up zsh/oh-my-zsh and BlackArch repo.
-3. Run \`install-tools.sh\` to install tools and configure user.
-4. (Optional) Run \`install-nvidia.sh\` for GPU acceleration.
+2. Run \`./install-core.sh\` to set up zsh/oh-my-zsh and BlackArch repo.
+3. Run \`./install-tools.sh\` to install tools and configure user.
+4. (Optional) Run \`./install-nvidia.sh\` for GPU acceleration.
 
 ## Tools Installed
 - **Basic Networking**: net-tools, iputils, openssh, curl, wget, bind-tools, socat, inetutils, tcpdump, openssl, speedtest-cli, netcat, whois.
@@ -238,7 +148,7 @@ Ghostarch is a streamlined setup for Arch Linux in WSL2, integrating selected bl
 - GPU (install-nvidia.sh): \`hashcat -m 0 -a 3 hash.txt\` (GPU cracking)
 
 ## Updates
-Run \`pacman -Syu\` to update Arch and BlackArch packages.
+Run \`sudo pacman -Syu\` to update Arch and BlackArch packages.
 
 ## Troubleshooting
 - **Signature Errors**: \`sudo pacman -S blackarch-keyring\`
@@ -260,6 +170,115 @@ For full pentesting, consider a native Linux VM.
     
     echo "$readme_content" | sudo tee "$WORKDIR/README.md" > /dev/null
     sudo chown "$TARGET_USER:$TARGET_USER" "$WORKDIR/README.md"
+}
+
+main() {
+    init_logging
+
+    log_info "Starting Ghostarch Tools Installation"
+
+    check_root
+    check_wsl
+    check_sudo
+    load_config
+
+    echo
+    log_info "Ghostarch Tools Installation"
+    echo "=============================="
+    echo
+    
+    # Load manifest if available
+    local pkg_groups_file="${PROJECT_ROOT}/lib/package-groups.conf"
+    if [[ -f "$pkg_groups_file" ]]; then
+        source "$pkg_groups_file"
+    fi
+
+    if [[ "$LIST_GROUPS" == "true" ]]; then
+        if declare -p PACKAGE_GROUPS &>/dev/null; then
+            echo "Available package groups:"
+            echo
+            for group in "${!PACKAGE_GROUPS[@]}"; do
+                echo "  $group"
+                echo "    Description: ${GROUP_DESCRIPTIONS[$group]:-}"
+                echo "    Packages: ${PACKAGE_GROUPS[$group]}"
+                echo
+            done
+        else
+            echo "No package groups defined."
+        fi
+        exit 0
+    fi
+
+    if [[ "${NONINTERACTIVE:-0}" != "1" ]]; then
+        echo "This will install:"
+        echo "  - Networking tools"
+        echo "  - Programming languages"
+        echo "  - Penetration testing tools"
+        echo "  - Reconnaissance tools"
+        echo "  - Additional tools"
+        echo
+        confirm "Continue?" "Y" || exit 0
+    fi
+
+    prompt_user_setup
+    prompt_workdir_setup
+
+    echo
+    log_info "=== Installing Tools ==="
+
+    if declare -p PACKAGE_GROUPS &>/dev/null; then
+        for group in "${!PACKAGE_GROUPS[@]}"; do
+            local skip=false
+            case "$group" in
+                networking) [[ "$SKIP_NETWORKING" == "true" ]] && skip=true ;;
+                programming) [[ "$SKIP_PROGRAMMING" == "true" ]] && skip=true ;;
+                pentest) [[ "$SKIP_PENTEST" == "true" ]] && skip=true ;;
+                recon) [[ "$SKIP_RECON" == "true" ]] && skip=true ;;
+                additional) [[ "$SKIP_ADDITIONAL" == "true" ]] && skip=true ;;
+            esac
+            
+            if [[ "$skip" == "true" ]]; then
+                log_info "Skipping $group"
+                continue
+            fi
+            
+            local desc="${GROUP_DESCRIPTIONS[$group]:-$group}"
+            install_tool_group "$desc" ${PACKAGE_GROUPS[$group]}
+        done
+    else
+        if [[ "$SKIP_NETWORKING" != "true" ]]; then
+            install_tool_group "Networking Tools" "${NETWORKING_PACKAGES[@]:-net-tools iputils openssh curl wget bind-tools socat inetutils tcpdump openssl speedtest-cli htop iotop iftop netcat whois p7zip}"
+        fi
+
+        if [[ "$SKIP_PROGRAMMING" != "true" ]]; then
+            install_tool_group "Programming Languages" "${PROGRAMMING_PACKAGES[@]:-python python-pip python-virtualenv go ruby}"
+        fi
+
+        if [[ "$SKIP_PENTEST" != "true" ]]; then
+            install_tool_group "Pentest Tools" "${PENTEST_PACKAGES[@]:-nmap ettercap wireshark-cli}"
+        fi
+
+        if [[ "$SKIP_RECON" != "true" ]]; then
+            install_tool_group "Recon Tools" "${RECON_PACKAGES[@]:-theharvester recon-ng dnsrecon}"
+        fi
+
+        if [[ "$SKIP_ADDITIONAL" != "true" ]]; then
+            install_tool_group "Additional Tools" "${ADDITIONAL_PACKAGES[@]:-nikto gobuster metasploit sqlmap volatility}"
+        fi
+    fi
+
+    generate_readme
+
+    log_info "=== Tools Installation Complete ==="
+    echo
+    echo "Summary:"
+    echo "  User: $TARGET_USER"
+    echo "  Working Directory: $WORKDIR"
+    echo
+    echo "Next steps:"
+    echo "  - Run ./install-nvidia.sh for GPU acceleration (optional)"
+    echo "  - Check $WORKDIR for your tools"
+    echo
 }
 
 main "$@"
