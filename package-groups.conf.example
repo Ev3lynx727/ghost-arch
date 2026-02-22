@@ -1,0 +1,34 @@
+#!/bin/bash
+# Package Groups Manifest for Ghostarch
+# Place this file as package-groups.conf in the project root
+# This overrides default package groups for complete customization
+
+# Format: Associative arrays
+# Add custom groups, modify existing ones, or remove groups entirely
+
+# Group descriptions (optional but recommended)
+declare -A GROUP_DESCRIPTIONS=(
+    [networking]="Networking diagnostics and utilities"
+    [programming]="Programming languages and package managers"
+    [pentest]="Penetration testing tools"
+    [recon]="Reconnaissance and OSINT"
+    [additional]="Additional security tools"
+    # [mycustom]="My custom toolset"  # Add your own!
+)
+
+# Package groups: group name -> space-separated package list
+declare -A PACKAGE_GROUPS=(
+    [networking]="net-tools iputils openssh curl wget bind-tools socat inetutils tcpdump openssl speedtest-cli htop iotop iftop netcat whois p7zip"
+    [programming]="python python-pip python-virtualenv go ruby"
+    [pentest]="nmap ettercap wireshark-cli"
+    [recon]="theharvester recon-ng dnsrecon"
+    [additional]="nikto gobuster metasploit sqlmap volatility"
+    # [mycustom]="mytool1 mytool2 mytool3"
+)
+
+# Notes:
+# - This completely replaces the default groups when present
+# - To skip a group, use --skip-<group> flag (e.g., --skip-networking)
+# - Skip flags are derived from group names (uppercase, hyphenated)
+# - Undefined groups are simply not processed
+# - See install-tools.sh --list-groups to see active configuration

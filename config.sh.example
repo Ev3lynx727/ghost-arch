@@ -3,6 +3,25 @@
 # Ghostarch Configuration File
 # Copy this to config.sh and customize as needed
 
+# ============================================
+# CONFIGURATION MODES
+# ============================================
+#
+# There are two ways to configure packages:
+#
+# 1. CONFIG ARRAYS (this file) — Modify the individual package arrays below
+# 2. MANIFEST FILE — Create package-groups.conf for full declarative control
+#
+# If package-groups.conf exists in the project root, it takes precedence over
+# the arrays in this file. The manifest approach allows:
+#   - Custom group definitions
+#   - Complete separation of data from code
+#   - Easier sharing of package configurations
+#
+# See package-groups.conf.example for the manifest format.
+#
+# ============================================
+
 # Installation Options
 INSTALL_ZSH=true
 INSTALL_OHMYZSH=true

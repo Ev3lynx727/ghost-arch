@@ -99,6 +99,26 @@ load_config() {
     fi
 }
 
+load_package_manifest() {
+    local manifest_file="${PROJECT_ROOT}/package-groups.conf"
+    if [[ -f "$manifest_file" ]]; then
+        log_info "Loading package manifest from $manifest_file"
+        # shellcheck disable=SC1090
+        source "$manifest_file" || {
+            log_error "Failed to load package manifest"
+            return 1
+        }
+        # Validate critical variables exist
+        if ! declare -p PACKAGE_GROUPS &>/dev/null; then
+            log_error "Manifest does not define PACKAGE_GROUPS associative array"
+            return 1
+        fi
+        log_info "Loaded ${#PACKAGE_GROUPS[@]} package groups from manifest"
+        return 0
+    fi
+    return 1
+}
+
 confirm() {
     local prompt="${1:-Continue?}"
     local default="${2:-Y}"
