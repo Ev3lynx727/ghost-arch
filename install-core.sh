@@ -6,8 +6,17 @@
 
 set -euo pipefail
 
+# Get script directory and project root
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/lib/common.sh"
+PROJECT_ROOT="${SCRIPT_DIR}"
+
+# Source common library
+if [[ -f "${PROJECT_ROOT}/lib/common.sh" ]]; then
+    source "${PROJECT_ROOT}/lib/common.sh"
+else
+    echo "Error: Could not find ${PROJECT_ROOT}/lib/common.sh"
+    exit 1
+fi
 
 usage() {
     cat << EOF
@@ -39,8 +48,8 @@ SKIP_BLACKARCH=false
 while [[ $# -gt 0 ]]; do
     case "$1" in
         -h|--help) usage ;;
-        -n|--noninteractive) NONINTERACTIVE=1 ;;
-        -d|--debug) DEBUG=1 ;;
+        -n|--noninteractive) export NONINTERACTIVE=1 ;;
+        -d|--debug) export DEBUG=1 ;;
         --skip-zsh) SKIP_ZSH=true ;;
         --skip-omz) SKIP_OMZ=true ;;
         --skip-blackarch) SKIP_BLACKARCH=true ;;
@@ -57,7 +66,7 @@ main() {
     check_root
     check_wsl
     
-    if [[ "$SKIP_ZSH" != "true" ]] && [[ "$SKIP_OMZ" != "true" ]]; then
+    if [[ "$SKIP_ZSH" != "true" ]] || [[ "$SKIP_OMZ" != "true" ]]; then
         check_network || exit 1
     fi
     
@@ -70,9 +79,6 @@ main() {
     if [[ "$SKIP_ZSH" != "true" ]]; then
         log_info "=== Installing Zsh ==="
         install_packages zsh
-        
-        log_info "Setting zsh as default shell..."
-        chsh -s /bin/zsh || log_warn "Failed to set zsh as default shell"
     fi
     
     if [[ "$SKIP_OMZ" != "true" ]]; then
@@ -86,17 +92,13 @@ main() {
         fi
         
         log_info "Installing Oh-My-Zsh plugins..."
-        git clone https://github.com/zsh-users/zsh-autosuggestions "${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/plugins/zsh-autosuggestions" 2>/dev/null || true
-        git clone https://github.com/zsh-users/zsh-syntax-highlighting "${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/plugins/zsh-syntax-highlighting" 2>/dev/null || true
-    fi
-    
-    log_info "=== Ghostarch Repository ==="
-    log_info "Using local repository at ${SCRIPT_DIR}"
-    
-    if [[ ! -d "${SCRIPT_DIR}/.git" ]]; then
-        log_warn "Not a git repository - skipping git operations"
-    else
-        log_info "Git repository detected"
+        local omz_custom="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"
+        if [[ ! -d "${omz_custom}/plugins/zsh-autosuggestions" ]]; then
+             git clone https://github.com/zsh-users/zsh-autosuggestions "${omz_custom}/plugins/zsh-autosuggestions" 2>/dev/null || true
+        fi
+        if [[ ! -d "${omz_custom}/plugins/zsh-syntax-highlighting" ]]; then
+            git clone https://github.com/zsh-users/zsh-syntax-highlighting "${omz_custom}/plugins/zsh-syntax-highlighting" 2>/dev/null || true
+        fi
     fi
     
     if [[ "$SKIP_BLACKARCH" != "true" ]]; then
