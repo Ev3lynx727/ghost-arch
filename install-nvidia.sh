@@ -28,14 +28,11 @@ main() {
     check_sudo
     load_config
 
-    log_info "Installing NVIDIA drivers for WSL2..."
-    install_packages nvidia nvidia-utils
+    # Use GPU_PACKAGES from config if defined, else defaults
+    local gpu_packages=("${GPU_PACKAGES[@]:-nvidia nvidia-utils cuda cuda-tools hashcat}")
 
-    log_info "Installing CUDA toolkit..."
-    install_packages cuda cuda-tools
-
-    log_info "Installing GPU-accelerated tools: hashcat..."
-    install_packages hashcat
+    log_info "Installing NVIDIA GPU packages..."
+    install_packages "${gpu_packages[@]}"
 
     log_info "Testing GPU setup..."
     if command -v nvidia-smi &>/dev/null; then

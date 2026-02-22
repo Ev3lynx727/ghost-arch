@@ -28,6 +28,7 @@ OPTIONS:
     -h, --help              Show this help message
     -n, --noninteractive   Run in non-interactive mode
     -d, --debug            Enable debug output
+    -l, --list-groups      Show available package groups
     --skip-networking      Skip networking tools
     --skip-programming     Skip programming languages
     --skip-pentest         Skip pentest tools
@@ -40,6 +41,7 @@ EXAMPLES:
     $0                      # Interactive installation with user prompts
     $0 --noninteractive     # Non-interactive with defaults
     $0 --skip-user          # Skip user creation prompts
+    $0 --list-groups        # Show all package groups and their packages
 
 EOF
     exit 0
@@ -52,12 +54,24 @@ SKIP_RECON=false
 SKIP_ADDITIONAL=false
 export SKIP_USER=false
 export SKIP_WORKDIR=false
+LIST_GROUPS=false
+
+# Package group mapping for DRY processing (config mode)
+# Format: [group]="PACKAGES_VAR 'Description'"
+declare -A GROUPS=(
+    [networking]="NETWORKING_PACKAGES 'Networking Tools'"
+    [programming]="PROGRAMMING_PACKAGES 'Programming Languages'"
+    [pentest]="PENTEST_PACKAGES 'Pentest Tools'"
+    [recon]="RECON_PACKAGES 'Recon Tools'"
+    [additional]="ADDITIONAL_PACKAGES 'Additional Tools'"
+)
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         -h|--help) usage ;;
         -n|--noninteractive) export NONINTERACTIVE=1 ;;
         -d|--debug) export DEBUG=1 ;;
+        -l|--list-groups) LIST_GROUPS=true ;;
         --skip-networking) SKIP_NETWORKING=true ;;
         --skip-programming) SKIP_PROGRAMMING=true ;;
         --skip-pentest) SKIP_PENTEST=true ;;
@@ -94,6 +108,97 @@ install_tool_group() {
     
     install_packages "${packages[@]}"
     log_info "$group_name installation complete"
+}
+
+list_groups() {
+    echo "Available package groups:"
+    echo
+
+    if declare -p PACKAGE_GROUPS &>/dev/null; then
+        # Manifest mode
+        for group in "${!PACKAGE_GROUPS[@]}"; do
+            echo "  $group"
+            echo "    Description: ${GROUP_DESCRIPTIONS[$group]:-N/A}"
+            echo "    Packages: ${PACKAGE_GROUPS[$group]}"
+            echo "    Skip flag: SKIP_$(echo "$group" | tr '[:lower:]' '[:upper:]')"
+            echo
+        done
+    else
+        # Config mode (or fallback)
+        for group in "${!GROUPS[@]}"; do
+            IFS=' ' read -r packages_var desc <<< "${GROUPS[$group]}"
+            desc="${desc%\"}"
+            desc="${desc#\"}"
+            local packages=("${!packages_var[@]}")
+            echo "  $group"
+            echo "    Description: $desc"
+            echo "    Packages: ${packages[*]:-N/A}"
+            echo "    Skip flag: SKIP_$(echo "$group" | tr '[:lower:]' '[:upper:]')"
+            echo
+        done
+    fi
+}
+
+process_package_groups() {
+    local groups mode
+
+    # Determine source of groups
+    if declare -p PACKAGE_GROUPS &>/dev/null; then
+        # Manifest mode: associative array
+        groups=("${!PACKAGE_GROUPS[@]}")
+        mode="manifest"
+    else
+        # Config mode: use GROUPS mapping keys
+        groups=("${!GROUPS[@]}")
+        mode="config"
+    fi
+
+    log_info "Processing ${#groups[@]} package groups (mode: $mode)"
+
+    for group in "${groups[@]}"; do
+        # Decoupled skip flag: SKIP_<GROUP_NAME> (uppercase)
+        local skip_var="SKIP_$(echo "$group" | tr '[:lower:]' '[:upper:]')"
+        local skip_val="${!skip_var:-}"
+
+        if [[ "$skip_val" == "true" ]]; then
+            log_info "Skipping $group (flag: $skip_var=true)"
+            continue
+        fi
+
+        # Resolve packages and description
+        local packages desc
+
+        if [[ "$mode" == "manifest" ]]; then
+            desc="${GROUP_DESCRIPTIONS[$group]:-$group}"
+            # Split space-separated string into array
+            packages=(${PACKAGE_GROUPS[$group]})
+        else
+            # Config mode: look up array by name from GROUPS mapping
+            IFS=' ' read -r packages_var desc <<< "${GROUPS[$group]}"
+            desc="${desc%\"}"
+            desc="${desc#\"}"
+            # Indirect expansion to get array
+            packages=("${!packages_var[@]}")
+        fi
+
+        if [[ ${#packages[@]} -eq 0 ]]; then
+            log_warn "No packages defined for group '$group', skipping"
+            continue
+        fi
+
+        install_tool_group "$desc" "${packages[@]}"
+    done
+}
+
+validate_manifest() {
+    if declare -p PACKAGE_GROUPS &>/dev/null; then
+        for group in "${!PACKAGE_GROUPS[@]}"; do
+            [[ -z "${GROUP_DESCRIPTIONS[$group]:-}" ]] && \
+                log_warn "Group '$group' has no description (consider adding to GROUP_DESCRIPTIONS)"
+            [[ -z "${PACKAGE_GROUPS[$group]}" ]] && \
+                log_warn "Group '$group' has empty package list"
+        done
+    fi
 }
 
 generate_readme() {
@@ -171,7 +276,21 @@ main() {
     check_root
     check_wsl
     check_sudo
-    load_config
+
+    # Load manifest (if exists) or config (manifest takes precedence)
+    if ! load_package_manifest; then
+        log_debug "No manifest found, using config arrays"
+        load_config
+    fi
+
+    # Handle --list-groups request
+    if [[ "$LIST_GROUPS" == "true" ]]; then
+        list_groups
+        exit 0
+    fi
+
+    # Validate manifest if present
+    validate_manifest
 
     echo
     log_info "Ghostarch Tools Installation"
@@ -195,25 +314,7 @@ main() {
     echo
     log_info "=== Installing Tools ==="
 
-    if [[ "$SKIP_NETWORKING" != "true" ]]; then
-        install_tool_group "Networking Tools" "${NETWORKING_PACKAGES[@]:-net-tools iputils openssh curl wget bind-tools socat inetutils tcpdump openssl speedtest-cli htop iotop iftop netcat whois p7zip}"
-    fi
-
-    if [[ "$SKIP_PROGRAMMING" != "true" ]]; then
-        install_tool_group "Programming Languages" "${PROGRAMMING_PACKAGES[@]:-python python-pip python-virtualenv go ruby}"
-    fi
-
-    if [[ "$SKIP_PENTEST" != "true" ]]; then
-        install_tool_group "Pentest Tools" "${PENTEST_PACKAGES[@]:-nmap ettercap wireshark-cli}"
-    fi
-
-    if [[ "$SKIP_RECON" != "true" ]]; then
-        install_tool_group "Recon Tools" "${RECON_PACKAGES[@]:-theharvester recon-ng dnsrecon}"
-    fi
-
-    if [[ "$SKIP_ADDITIONAL" != "true" ]]; then
-        install_tool_group "Additional Tools" "${ADDITIONAL_PACKAGES[@]:-nikto gobuster metasploit sqlmap volatility}"
-    fi
+    process_package_groups
 
     generate_readme
 
