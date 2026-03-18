@@ -14,12 +14,14 @@ Ghostarch is an automated installer for Arch Linux in WSL2, designed for securit
 ## 📂 Repository Structure
 
 - `install-ghostarch.sh`: Main orchestrator (Run this first!).
-- `install-core.sh`: Core system setup (Zsh, BlackArch repo).
-- `install-tools.sh`: curated pentest tools and user workspace setup.
+- `install-core.sh`: Core system setup (BlackArch repo, core tools).
+- `install-tools.sh`: Curated pentest tools and user workspace setup.
 - `install-nvidia.sh`: GPU acceleration setup for NVIDIA users.
-- `lib/common.sh`: Shared helper functions and logic.
+- `lib/`: Modular helper functions (args, common, groups, packages, prompts, readme, system, zsh).
 - `templates/`: Configuration templates (e.g., `.zshrc`).
-- `docs/`: Additional documentation.
+- `docs/`: Detailed design and migration documentation.
+- `config.sh.example`: Configuration template for custom setups.
+- `package-groups.conf.example`: Manifest template for declarative package management.
 
 ## 🛠️ Installation
 

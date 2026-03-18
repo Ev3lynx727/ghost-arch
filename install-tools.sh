@@ -217,20 +217,6 @@ Ghostarch is a streamlined setup for Arch Linux in WSL2, integrating selected bl
 2. Run \`./install-core.sh\` to set up zsh/oh-my-zsh and BlackArch repo.
 3. Run \`./install-tools.sh\` to install tools and configure user.
 4. (Optional) Run \`./install-nvidia.sh\` for GPU acceleration.
-
-## Tools Installed
-- **Basic Networking**: net-tools, iputils, openssh, curl, wget, bind-tools, socat, inetutils, tcpdump, openssl, speedtest-cli, netcat, whois.
-- **Monitoring**: htop, iotop, iftop.
-- **Programming Languages**: python, python-pip, go, ruby.
-- **Pentest Tools**: nmap, ettercap, wireshark-cli.
-- **Recon Tools**: theharvester, recon-ng, dnsrecon.
-- **Additional Tools**: nikto, gobuster, metasploit, sqlmap, volatility.
-
-## WSL2 Limitations and Workarounds
-- **Network Access**: No direct WiFi interface access.
-- **Scans**: SYN scans may fail; use connect scans.
-
-For full pentesting, consider a native Linux VM.
 "
     
     echo "$readme_content" | sudo tee "$WORKDIR/README.md" > /dev/null

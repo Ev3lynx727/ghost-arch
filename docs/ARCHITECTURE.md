@@ -17,21 +17,30 @@ Ghostarch is a modular installer for Arch Linux in WSL2, integrating selected Bl
 
 ## Directory Structure
 
-```
+```bash
 ghost-arch/
 ├── install-ghostarch.sh      # Orchestrator (main entry point)
-├── install-core.sh           # Core: zsh, oh-my-zsh, BlackArch repo
+├── install-core.sh           # Core: oh-my-zsh, repository setup
 ├── install-tools.sh          # Tools: package groups, user, workdir
 ├── install-nvidia.sh        # GPU: NVIDIA drivers, CUDA, hashcat
-├── lib/
-│   └── common.sh            # Shared utilities (logging, checks, prompts)
+├── lib/                     # Modular helper functions
+│   ├── args.sh              # CLI argument parsing
+│   ├── common.sh            # Shared core utilities (logging, config)
+│   ├── groups.sh            # Package group definitions and listing
+│   ├── packages.sh          # Package installation and updates
+│   ├── prompts.sh           # User interaction and setup prompts
+│   ├── readme.sh            # README.md generation logic
+│   ├── system.sh            # Environment checks and validation
+│   └── zsh.sh               # Zsh configuration and setup
 ├── templates/
 │   └── zshrc                # Zshell configuration template
+├── docs/                    # Detailed documentation
+│   ├── ARCHITECTURE.md      # This file (design documentation)
+│   ├── MIGRATION.md         # Guide: config arrays → manifest
+│   └── pre-installation.md  # Prerequisites and WSL2 setup
 ├── config.sh.example        # Configuration template (arrays + flags)
 ├── package-groups.conf.example  # Manifest template (declarative)
-├── README.MD                # Generated documentation (user-facing)
-├── MIGRATION.md             # Guide: config arrays → manifest
-├── ARCHITECTURE.md          # This file (design documentation)
+├── README.MD                # Master documentation (user-facing)
 └── AGENTS.md                # Agent integration notes
 ```
 
@@ -133,6 +142,7 @@ Manifest takes precedence. This allows gradual migration.
 **Purpose:** Establish foundational tools and repositories.
 
 **Installs:**
+
 - Zsh (if not present)
 - Oh-My-Zsh with plugins (zsh-autosuggestions, zsh-syntax-highlighting)
 - BlackArch repository and keyring
@@ -160,6 +170,7 @@ Manifest takes precedence. This allows gradual migration.
 **Package Group Concept:**
 
 A "group" is a logical collection of related packages with a human-readable description. Default groups:
+
 - `networking` — network diagnostics (net-tools, curl, tcpdump, etc.)
 - `programming` — languages (python, go, ruby)
 - `pentest` — pentesting (nmap, ettercap, wireshark)
@@ -167,16 +178,19 @@ A "group" is a logical collection of related packages with a human-readable desc
 - `additional` — misc security tools (nikto, metasploit, sqlmap)
 
 **Skip Flags:**
+
 - Groups are skipped via `--skip-<group>` flags
 - Flag names derived from group names (lowercase)
 - Example: `--skip-networking`, `--skip-pentest`
 
 **Configuration Sources:**
+
 - Manifest: `PACKAGE_GROUPS[group]` + `GROUP_DESCRIPTIONS[group]`
 - Config: `NETWORKING_PACKAGES` array (via `GROUPS` mapping)
 - Fallback: hardcoded defaults in script
 
 **Usage:**
+
 ```bash
 ./install-tools.sh                      # Interactive
 ./install-tools.sh --noninteractive     # Automated
@@ -191,17 +205,20 @@ A "group" is a logical collection of related packages with a human-readable desc
 **Purpose:** Set up NVIDIA WSL2 drivers and GPU-accelerated tools.
 
 **Installs:**
+
 - `nvidia` + `nvidia-utils` (drivers)
 - `cuda` + `cuda-tools` (CUDA toolkit)
 - `hashcat` (GPU password cracking)
 
 **Configuration:**
+
 - Uses `GPU_PACKAGES` array from `config.sh` if defined
 - Otherwise uses built-in defaults: `nvidia nvidia-utils cuda cuda-tools hashcat`
 
 **Note:** Requires NVIDIA WSL2 drivers on Windows host.
 
 **Usage:**
+
 ```bash
 # After install-tools.sh (or orchestrator)
 ./install-nvidia.sh
@@ -209,40 +226,32 @@ A "group" is a logical collection of related packages with a human-readable desc
 
 ---
 
-### `lib/common.sh` (Shared Library)
+### `lib/` (Shared Modules)
 
-**Purpose:** Centralized utilities for all installer scripts.
+**Purpose:** Decoupled functional modules used across the installer.
 
-**Key Functions:**
-
-| Function | Purpose |
-|----------|---------|
-| `init_logging()` | Setup log file (`~/.ghostarch/install.log`) |
-| `log_info()`, `log_warn()`, `log_error()`, `log_debug()` | Colored console + file logging |
-| `check_root()` | Warn if running as root |
-| `check_wsl()` | Detect WSL environment |
-| `check_sudo()` | Verify sudo privileges |
-| `check_network()` | Test connectivity (for BlackArch) |
-| `load_config()` | Source `config.sh` if present |
-| `load_package_manifest()` | Source `package-groups.conf` if present (NEW) |
-| `confirm()` | Interactive yes/no prompt |
-| `prompt_user()` | Generic input prompt with defaults |
-| `prompt_user_setup()` | User creation/selection flow |
-| `prompt_workdir_setup()` | Workspace directory setup |
-| `install_packages()` | Wrapper for `pacman -S` |
-| `add_blackarch_repo()` | BlackArchstrap script |
+| Module | Purpose | Key Functions |
+|--------|---------|---------------|
+| `common.sh` | Core utilities | `init_logging`, `load_config`, `load_package_manifest` |
+| `args.sh` | CLI arguments | `parse_args` (internal to scripts) |
+| `groups.sh` | Package groups | `list_groups`, `validate_manifest` |
+| `packages.sh` | Installation | `install_packages`, `install_tool_group` |
+| `prompts.sh` | Interaction | `confirm`, `prompt_user`, `prompt_user_setup` |
+| `readme.sh` | Documentation | `generate_readme` |
+| `system.sh` | Validation | `check_root`, `check_wsl`, `check_sudo`, `check_network` |
+| `zsh.sh` | Shell setup | `install_zsh`, `setup_oh_my_zsh` |
 
 **Design Principles:**
-- No script-specific state (reusable)
-- Logging always writes to file for debugging
-- Non-interactive mode respects `NONINTERACTIVE=1`
-- Fail safe: warnings, not errors, for non-critical issues
+
+- **Encapsulation:** Logic is grouped by domain (e.g., all prompting in `prompts.sh`).
+- **Reusability:** Functions are designed to be called by any of the main `install-*.sh` scripts.
+- **Fail-fast:** System checks in `system.sh` prevent execution on unsupported environments.
 
 ---
 
 ## Package Resolution Flow
 
-```
+```mermaid
 ┌─────────────────────────────────────┐
 │  install-tools.sh main() begins     │
 └───────────────┬─────────────────────┘
@@ -286,7 +295,7 @@ A "group" is a logical collection of related packages with a human-readable desc
 
 **Skip Flag Convention:**
 
-```
+```text
 Group name:       "networking"
 Skip flag var:    SKIP_NETWORKING
 Skip flag value:  "true" to skip
@@ -399,6 +408,7 @@ done
 ```
 
 **Good (Hybrid):**
+
 ```bash
 skip_var="SKIP_$(echo "$group" | tr '[:lower:]' '[:upper:]')"
 [[ "${!skip_var:-}" == "true" ]] && skip=true
@@ -429,7 +439,7 @@ This ensures consistency and reduces duplication.
 ## Testing Matrix
 
 | Scenario | Setup | Expected behavior |
-|----------|-------|-------------------|
+| :--- | :--- | :--- |
 | Default (no config, no manifest) | — | Uses hardcoded defaults (5 groups) |
 | Config only | `config.sh` present | Loads config arrays, 5 groups |
 | Manifest only | `package-groups.conf` present | Loads manifest groups |
@@ -500,17 +510,17 @@ Trade-off: Slightly less explicit, but documented and validated via `--list-grou
 
 ## Key Files Reference
 
-| File | Lines (approx) | Purpose |
-|------|----------------|---------|
+| File | Lines | Purpose |
+| :--- | :--- | :--- |
 | `install-ghostarch.sh` | 120 | Orchestrator |
 | `install-core.sh` | 180 | Core setup |
 | `install-tools.sh` | 320 | Tools + manifest system |
 | `install-nvidia.sh` | 80 | GPU setup |
-| `lib/common.sh` | 280 | Shared utilities |
+| `lib/*.sh` | 800+ | Combined shared modules |
+| `docs/ARCHITECTURE.md` | this | Design documentation |
+| `docs/MIGRATION.md` | 200 | Migration guide |
 | `config.sh.example` | 120 | Config template |
 | `package-groups.conf.example` | 60 | Manifest template |
-| `MIGRATION.md` | 200 | Migration guide |
-| `ARCHITECTURE.md` | this | Design documentation |
 
 ---
 

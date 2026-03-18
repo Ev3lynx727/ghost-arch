@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Ghostarch Common Library
-# Shared helper functions for all installation scripts
+# Core utilities: logging, configuration, and error handling
 
 set -euo pipefail
 
@@ -16,6 +16,17 @@ LOG_FILE="${LOG_FILE:-${HOME}/.ghostarch/install.log}"
 GHOSTARCH_VERSION="1.0.0"
 CONFIG_FILE="${PROJECT_ROOT}/config.sh"
 
+# Source module libraries
+# shellcheck disable=SC1091,SC2086
+source "${SCRIPT_DIR}/system.sh" || exit 1
+source "${SCRIPT_DIR}/packages.sh" || exit 1
+source "${SCRIPT_DIR}/prompts.sh" || exit 1
+source "${SCRIPT_DIR}/args.sh" || exit 1
+source "${SCRIPT_DIR}/groups.sh" || exit 1
+source "${SCRIPT_DIR}/readme.sh" || exit 1
+source "${SCRIPT_DIR}/zsh.sh" || exit 1
+
+# Color output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -28,65 +39,27 @@ log() {
     local msg="$*"
     local timestamp
     timestamp=$(date '+%Y-%m-%d %H:%M:%S')
-    
+
     case "$level" in
-        INFO)  echo -e "${GREEN}[INFO]${NC} $msg" ;;
-        WARN)  echo -e "${YELLOW}[WARN]${NC} $msg" ;;
-        ERROR) echo -e "${RED}[ERROR]${NC} $msg" ;;
-        DEBUG) [[ "${DEBUG:-0}" == "1" ]] && echo -e "${BLUE}[DEBUG]${NC} $msg" ;;
+    INFO) echo -e "${GREEN}[INFO]${NC} $msg" ;;
+    WARN) echo -e "${YELLOW}[WARN]${NC} $msg" ;;
+    ERROR) echo -e "${RED}[ERROR]${NC} $msg" ;;
+    DEBUG) [[ "${DEBUG:-0}" == "1" ]] && echo -e "${BLUE}[DEBUG]${NC} $msg" ;;
     esac
-    
-    echo "[$timestamp] [$level] $msg" >> "$LOG_FILE" 2>/dev/null || true
+
+    echo "[$timestamp] [$level] $msg" >>"$LOG_FILE" 2>/dev/null || true
 }
 
-log_info()   { log "INFO" "$@"; }
-log_warn()   { log "WARN" "$@"; }
-log_error()  { log "ERROR" "$@"; }
-log_debug()  { log "DEBUG" "$@"; }
+log_info() { log "INFO" "$@"; }
+log_warn() { log "WARN" "$@"; }
+log_error() { log "ERROR" "$@"; }
+log_debug() { log "DEBUG" "$@"; }
 
 init_logging() {
     mkdir -p "$(dirname "$LOG_FILE")"
     touch "$LOG_FILE"
     chmod 644 "$LOG_FILE" 2>/dev/null || true
     log_info "Ghostarch v${GHOSTARCH_VERSION} installation started"
-}
-
-check_root() {
-    if [[ $EUID -eq 0 ]]; then
-        if [[ -f /proc/version ]] && grep -qi microsoft /proc/version 2>/dev/null; then
-            log_warn "Running as root in WSL2 - some features may not work"
-            log_info "Consider running as regular user with sudo"
-        else
-            log_warn "Running as root - some features may not work as expected"
-        fi
-    fi
-}
-
-check_wsl() {
-    if [[ ! -f /proc/version ]] || ! grep -qi microsoft /proc/version; then
-        log_warn "This script is designed for WSL2. Running on regular Linux"
-    else
-        log_info "WSL2 environment detected"
-    fi
-}
-
-check_network() {
-    log_info "Checking network connectivity..."
-    if curl -sf --max-time 10 https://blackarch.org > /dev/null 2>&1; then
-        log_info "Network connectivity OK"
-        return 0
-    else
-        log_error "No network connectivity"
-        return 1
-    fi
-}
-
-check_sudo() {
-    if ! sudo -v 2>/dev/null; then
-        log_error "sudo privileges required"
-        exit 1
-    fi
-    log_info "sudo privileges available"
 }
 
 load_config() {
@@ -96,207 +69,6 @@ load_config() {
         source "$CONFIG_FILE"
     else
         log_warn "Config file not found, using defaults"
-    fi
-}
-
-load_package_manifest() {
-    local manifest_file="${PROJECT_ROOT}/package-groups.conf"
-    if [[ -f "$manifest_file" ]]; then
-        log_info "Loading package manifest from $manifest_file"
-        # shellcheck disable=SC1090
-        source "$manifest_file" || {
-            log_error "Failed to load package manifest"
-            return 1
-        }
-        # Validate critical variables exist
-        if ! declare -p PACKAGE_GROUPS &>/dev/null; then
-            log_error "Manifest does not define PACKAGE_GROUPS associative array"
-            return 1
-        fi
-        log_info "Loaded ${#PACKAGE_GROUPS[@]} package groups from manifest"
-        return 0
-    fi
-    return 1
-}
-
-confirm() {
-    local prompt="${1:-Continue?}"
-    local default="${2:-Y}"
-    
-    if [[ "${NONINTERACTIVE:-0}" == "1" ]]; then
-        return 0
-    fi
-    
-    local yn
-    case "$default" in
-        Y|y) yn="Y/n" ;;
-        N|n) yn="y/N" ;;
-        *)   yn="y/n" ;;
-    esac
-    
-    echo -n "$prompt [$yn]: "
-    read -r yn
-    
-    case "$yn" in
-        Y|y|yes|Yes|YES) return 0 ;;
-        N|n|no|No|NO)    return 1 ;;
-        *) [[ "$default" == "Y" ]] && return 0 || return 1 ;;
-    esac
-}
-
-prompt_user() {
-    local prompt="$1"
-    local default="${2:-}"
-    local var_name="$3"
-    
-    if [[ "${NONINTERACTIVE:-0}" == "1" ]]; then
-        eval "$var_name='$default'"
-        return 0
-    fi
-    
-    echo -n "$prompt"
-    [[ -n "$default" ]] && echo -n " [$default]"
-    echo -n ": "
-    read -r input
-    
-    local result="${input:-$default}"
-    eval "$var_name='$result'"
-}
-
-prompt_user_setup() {
-    echo
-    log_info "=== User Configuration ==="
-    echo
-
-    if [[ "${SKIP_USER:-false}" == "true" ]]; then
-        log_warn "Skipping user configuration"
-        TARGET_USER="${TARGET_USER:-$(whoami)}"
-        return 0
-    fi
-
-    local user_choice
-    prompt_user "Create new user or use existing? (new/existing)" "existing" user_choice
-
-    case "$user_choice" in
-        new|NEW|New)
-            local new_username
-            prompt_user "Enter new username" "ghostuser" new_username
-
-            if id "$new_username" &>/dev/null; then
-                log_warn "User $new_username already exists"
-                TARGET_USER="$new_username"
-            else
-                log_info "Creating user: $new_username"
-                sudo useradd -m -s /bin/zsh -G wheel "$new_username"
-
-                if [[ "${NONINTERACTIVE:-0}" != "1" ]]; then
-                    local set_password
-                    prompt_user "Set password for $new_username? (yes/no)" "yes" set_password
-                    if [[ "$set_password" == "yes" ]]; then
-                        sudo passwd "$new_username"
-                    fi
-                fi
-
-                TARGET_USER="$new_username"
-                log_info "User $new_username created successfully"
-            fi
-            ;;
-        *)
-            local current_user
-            current_user=$(whoami)
-            prompt_user "Enter username" "$current_user" TARGET_USER
-
-            if ! id "$TARGET_USER" &>/dev/null; then
-                log_error "User $TARGET_USER does not exist"
-                exit 1
-            fi
-            ;;
-    esac
-
-    echo
-    log_info "Selected user: $TARGET_USER"
-}
-
-prompt_workdir_setup() {
-    echo
-    log_info "=== Working Directory Setup ==="
-    echo
-
-    if [[ "${SKIP_WORKDIR:-false}" == "true" ]]; then
-        log_warn "Skipping working directory setup"
-        WORKDIR="${WORKDIR:-$HOME/ghostarch}"
-        return 0
-    fi
-
-    prompt_user "Enter working directory path" "${HOME}/ghostarch" WORKDIR
-
-    log_info "Creating working directory: $WORKDIR"
-    sudo -u "$TARGET_USER" mkdir -p "$WORKDIR"
-
-    local init_git
-    prompt_user "Initialize git repository in workdir? (yes/no)" "yes" init_git
-
-    if [[ "$init_git" == "yes" ]]; then
-        if [[ ! -d "$WORKDIR/.git" ]]; then
-            sudo -u "$TARGET_USER" git -C "$WORKDIR" init || log_warn "Failed to initialize git"
-        else
-            log_info "Git repo already exists"
-        fi
-    fi
-
-    local create_subdirs
-    prompt_user "Create subdirectories (tools, exploits, wordlists)? (yes/no)" "yes" create_subdirs
-
-    if [[ "$create_subdirs" == "yes" ]]; then
-        sudo -u "$TARGET_USER" mkdir -p "$WORKDIR"/{tools,exploits,wordlists,reports,logs}
-        log_info "Subdirectories created"
-    fi
-
-    echo
-    log_info "Working directory: $WORKDIR"
-}
-
-install_packages() {
-    local packages=("$@")
-    local package_list="${packages[*]}"
-    
-    if [[ ${#packages[@]} -eq 0 ]]; then
-        log_warn "No packages to install"
-        return 0
-    fi
-    
-    log_info "Installing packages: $package_list"
-    sudo pacman -S --noconfirm --needed "${packages[@]}"
-}
-
-update_system() {
-    log_info "Updating system..."
-    sudo pacman -Syu --noconfirm
-}
-
-add_blackarch_repo() {
-    log_info "Adding BlackArch repository..."
-    
-    local strap_sh="/tmp/strap.sh"
-    
-    curl -fsSL https://blackarch.org/strap.sh -o "$strap_sh"
-    
-    log_info "Verifying strap.sh checksum..."
-    if curl -fsSL https://blackarch.org/strap.sh.sha256sum | sha256sum -c 2>/dev/null; then
-        log_info "Checksum verified"
-    else
-        log_warn "Checksum verification failed, proceeding anyway"
-    fi
-    
-    log_info "Running BlackArch strap script..."
-    sudo bash "$strap_sh"
-    rm -f "$strap_sh"
-    
-    log_info "Installing BlackArch keyring..."
-    if pacman -Qs blackarch-keyring > /dev/null 2>&1; then
-        log_info "BlackArch keyring already installed, skipping"
-    else
-        sudo pacman -S --noconfirm --overwrite='*' blackarch-keyring || log_warn "Keyring installation had issues, continuing..."
     fi
 }
 
