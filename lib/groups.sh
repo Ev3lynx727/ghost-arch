@@ -5,6 +5,7 @@
 
 # Package group mapping for DRY processing (config mode)
 # Format: [group]="PACKAGES_VAR 'Description'"
+# shellcheck disable=SC2034
 declare -A GROUPS=(
     [networking]="NETWORKING_PACKAGES 'Networking Tools'"
     [programming]="PROGRAMMING_PACKAGES 'Programming Languages'"

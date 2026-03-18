@@ -19,11 +19,17 @@ CONFIG_FILE="${PROJECT_ROOT}/config.sh"
 # Source module libraries
 # shellcheck disable=SC1091,SC2086
 source "${SCRIPT_DIR}/system.sh" || exit 1
+# shellcheck disable=SC1091
 source "${SCRIPT_DIR}/packages.sh" || exit 1
+# shellcheck disable=SC1091
 source "${SCRIPT_DIR}/prompts.sh" || exit 1
+# shellcheck disable=SC1091
 source "${SCRIPT_DIR}/args.sh" || exit 1
+# shellcheck disable=SC1091
 source "${SCRIPT_DIR}/groups.sh" || exit 1
+# shellcheck disable=SC1091
 source "${SCRIPT_DIR}/readme.sh" || exit 1
+# shellcheck disable=SC1091
 source "${SCRIPT_DIR}/zsh.sh" || exit 1
 
 # Color output

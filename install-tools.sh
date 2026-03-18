@@ -52,10 +52,15 @@ EOF
     exit 0
 }
 
+# shellcheck disable=SC2034
 SKIP_NETWORKING=false
+# shellcheck disable=SC2034
 SKIP_PROGRAMMING=false
+# shellcheck disable=SC2034
 SKIP_PENTEST=false
+# shellcheck disable=SC2034
 SKIP_RECON=false
+# shellcheck disable=SC2034
 SKIP_ADDITIONAL=false
 export SKIP_USER=false
 export SKIP_WORKDIR=false
@@ -160,7 +165,8 @@ process_package_groups() {
     log_info "Processing ${#groups[@]} package groups (mode: $mode)"
 
     for group in "${groups[@]}"; do
-        local skip_var="SKIP_$(echo "$group" | tr '[:lower:]' '[:upper:]')"
+        local skip_var
+        skip_var="SKIP_$(echo "$group" | tr '[:lower:]' '[:upper:]')"
         local skip_val="${!skip_var:-}"
 
         if [[ "$skip_val" == "true" ]]; then
@@ -172,6 +178,8 @@ process_package_groups() {
 
         if [[ "$mode" == "manifest" ]]; then
             desc="${GROUP_DESCRIPTIONS[$group]:-$group}"
+            # Split space-separated string into array (SC2206 intentional here)
+            # shellcheck disable=SC2206
             packages=(${PACKAGE_GROUPS[$group]})
         else
             IFS=' ' read -r packages_var desc <<< "${GROUPS[$group]}"
