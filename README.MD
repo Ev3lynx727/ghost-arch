@@ -36,7 +36,7 @@ Ghostarch is an automated installer for Arch Linux in WSL2, designed for securit
 Clone this repository and run the main installer:
 
 ```bash
-git clone https://github.com/youruser/ghostarch.git
+git clone https://github.com/Ev3lynx727/ghostarch.git
 cd ghostarch
 chmod +x *.sh
 ./install-ghostarch.sh
